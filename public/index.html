@@ -1,144 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Supabase Fullstack Demo</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/supabase.min.js"></script>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 500px;
-      margin: 2rem auto;
-      padding: 0 1rem;
-    }
-    input, button {
-      font-size: 1rem;
-      padding: 0.5rem;
-      margin-right: 0.5rem;
-    }
-    ul {
-      list-style: none;
-      padding-left: 0;
-    }
-    li {
-      margin: 0.5rem 0;
-      cursor: pointer;
-    }
-    li.done {
-      text-decoration: line-through;
-      color: gray;
-    }
-    button.delete-btn {
-      background: crimson;
-      color: white;
-      border: none;
-      cursor: pointer;
-      padding: 0.2rem 0.5rem;
-      margin-left: 1rem;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Supabase Messages Demo</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 600px; margin: 20px auto; }
+  ul { list-style: none; padding: 0; }
+  li { margin-bottom: 10px; padding: 10px; background: #f4f4f4; border-radius: 5px; }
+  form { margin-top: 20px; }
+  input[type="text"] { padding: 10px; width: 80%; }
+  button { padding: 10px; }
+</style>
 </head>
 <body>
 
-  <h1>Supabase Tasks Demo</h1>
+<h1>Messages</h1>
+<ul id="messages"></ul>
 
-  <input id="task-input" type="text" placeholder="Enter new task" />
-  <button id="add-task-btn">Add Task</button>
+<form id="form">
+  <input type="text" id="content" placeholder="Write a message..." autocomplete="off" />
+  <button type="submit">Send</button>
+</form>
 
-  <ul id="tasks-list"></ul>
+<script>
+  async function fetchMessages() {
+    const res = await fetch('/api/messages');
+    const data = await res.json();
+    const ul = document.getElementById('messages');
+    ul.innerHTML = '';
+    data.forEach(msg => {
+      const li = document.createElement('li');
+      li.textContent = msg.content + ' (' + new Date(msg.created_at).toLocaleString() + ')';
+      ul.appendChild(li);
+    });
+  }
 
-  <script>
-    const SUPABASE_URL = 'https://ickblnomdoptiescmkht.supabase.co'
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlja2Jsbm9tZGllc2Nta2h0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQ5ODkzMjksImV4cCI6MjA3MDU2NTMyOX0.CYP17CdJDwocDh4IxQBVG2cU6zdxBPJHckzMRJ7S61g'
+  async function sendMessage(content) {
+    await fetch('/api/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+  }
 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  document.getElementById('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('content');
+    const content = input.value.trim();
+    if (!content) return alert('Please enter a message');
+    await sendMessage(content);
+    input.value = '';
+    fetchMessages();
+  });
 
-    const taskInput = document.getElementById('task-input')
-    const addTaskBtn = document.getElementById('add-task-btn')
-    const tasksList = document.getElementById('tasks-list')
+  fetchMessages();
+  // Optional: refresh messages every 10 seconds
+  setInterval(fetchMessages, 10000);
+</script>
 
-    async function loadTasks() {
-      const { data: tasks, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('id', { ascending: true })
-
-      if (error) {
-        alert('Error loading tasks: ' + error.message)
-        return
-      }
-
-      tasksList.innerHTML = ''
-
-      tasks.forEach(task => {
-        const li = document.createElement('li')
-        li.textContent = task.title
-        li.dataset.id = task.id
-        li.className = task.done ? 'done' : ''
-
-        li.addEventListener('click', () => toggleTaskDone(task))
-
-        const delBtn = document.createElement('button')
-        delBtn.textContent = 'Delete'
-        delBtn.className = 'delete-btn'
-        delBtn.addEventListener('click', (e) => {
-          e.stopPropagation()
-          deleteTask(task)
-        })
-
-        li.appendChild(delBtn)
-        tasksList.appendChild(li)
-      })
-    }
-
-    async function addTask() {
-      const title = taskInput.value.trim()
-      if (!title) return alert('Please enter a task title')
-
-      const { data, error } = await supabase
-        .from('tasks')
-        .insert([{ title, done: false }])
-
-      if (error) {
-        alert('Error adding task: ' + error.message)
-        return
-      }
-
-      taskInput.value = ''
-      loadTasks()
-    }
-
-    async function toggleTaskDone(task) {
-      const { data, error } = await supabase
-        .from('tasks')
-        .update({ done: !task.done })
-        .eq('id', task.id)
-
-      if (error) {
-        alert('Error toggling task: ' + error.message)
-        return
-      }
-
-      loadTasks()
-    }
-
-    async function deleteTask(task) {
-      const { error } = await supabase
-        .from('tasks')
-        .delete()
-        .eq('id', task.id)
-
-      if (error) {
-        alert('Error deleting task: ' + error.message)
-        return
-      }
-
-      loadTasks()
-    }
-
-    addTaskBtn.addEventListener('click', addTask)
-    window.addEventListener('load', loadTasks)
-  </script>
 </body>
 </html>
